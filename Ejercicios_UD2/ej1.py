@@ -35,7 +35,7 @@ def moveFile(ruta, dest):
 
 def delete(ruta):
     if os.path.exists(ruta):
-        if os.path.isfile("bob.txt"):
+        if os.path.isfile(ruta):
             os.remove(ruta)
         else:
             if len(os.listdir(ruta)) == 0:
@@ -71,7 +71,9 @@ while opc != "6":
         dest = input()
         moveFile(ruta, dest)
     if opc == "5":
-        print("")
+        print("Introduce la ruta completa del archivo o directorio que quieras borrar: ")
+        ruta = input()
+        delete(ruta);
     if opc != "6":
         print("""¿Que desea hacer?
                     1.  Crear un directorio
