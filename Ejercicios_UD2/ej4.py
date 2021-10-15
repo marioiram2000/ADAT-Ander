@@ -3,11 +3,11 @@ import xml.sax
 
 
 class olimpiada:
-    def __init__(self):
-        self.year = ""
-        self.juegos = ""
-        self.temporada = ""
-        self.ciudad = ""
+    def __init__(self, year="", juegos="", temporada="", ciudad=""):
+        self.year = year
+        self.juegos = juegos
+        self.temporada = temporada
+        self.ciudad = ciudad
 
     def __str__(self):
         print(self.year + "\t" + self.juegos + "\t" + self.temporada + "\t" + self.ciudad)
@@ -40,7 +40,7 @@ class olimpiadasHandler(xml.sax.ContentHandler):
 
 
 opc = 0
-while opc != "4":
+while opc != "5":
     if opc == "1":
         Handler = olimpiadasHandler()
         parser = xml.sax.make_parser()
@@ -48,18 +48,48 @@ while opc != "4":
         parser.setContentHandler(Handler)
         parser.parse("data/olimpiadas.xml")
         olimpiadas = Handler.olimpiadas
-        data_string = pickle.dumps(olimpiadas)
-        with open('data/objetosOlimpiada', 'wb') as handle:
-            pickle.dump(data_string, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open('data/objetosOlimpiada.pickle', 'wb') as handle:
+            for olimp in olimpiadas:
+                pickle.dump(olimp, handle)
 
     if opc == "2":
-        print()
+        anio = input("Año: ")
+        temporada = input("Temporada: ")
+        ciudad = input("Ciudad: ")
+        nombre = anio + " " + temporada
+
+        olimp = olimpiada(anio, nombre, temporada, ciudad)
+        with open('data/objetosOlimpiada.pickle', 'wb') as handle:
+            pickle.dump(olimp, handle)
 
     if opc == "3":
-        print()
+        sede = input("Introduce la sede: \n")
+        with open('data/objetosOlimpiada.pickle', 'rb') as f:
+            while True:
+                try:
+                    olimpiada = pickle.load(f)
+                    if (olimpiada.ciudad == sede):
+                        print(olimpiada.__str__())
+                except EOFError:
+                    break
 
     if opc == "4":
-        print()
+        print("Introduce los datos de la olimpiada");
+        ciudad = input("Ciudad: ")
+        anio = input("Año: ")
+        olimps = []
+        with open('data/objetosOlimpiada.pickle', 'rb') as openHandler:
+            while True:
+                try:
+                    olimp = pickle.load(openHandler)
+                    if olimp.year != anio and olimp.ciudad != ciudad:
+                        olimps.append(olimp)
+                except EOFError:
+                    break
+
+        with open('data/objetosOlimpiada.pickle', 'wb') as writeHandler:
+            for olimp in olimps:
+                pickle.dump(olimp, writeHandler)
 
     if opc != "5":
         print("""Que desea hacer?
