@@ -1,6 +1,5 @@
-import csv
 import pandas as pd
-import os
+
 opc = "0"
 while opc != "5":
     if opc == "1":
