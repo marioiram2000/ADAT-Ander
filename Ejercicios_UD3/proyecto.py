@@ -1,35 +1,77 @@
 from csv import DictReader
 import mysql.connector
+import sqlite3
 from time import time
+
 # MIRAMOS EL MOMENTO EN EL QUE EMPIEZA LA EJECUCIÓN, PARA LUEGO VER LO QUE TARDA
 timmerStart = time()
 
-# CREAMOS LA CONEXIÓN A LA BASE DE DATOS, con autocommit, para que se inserten los datos directamente
-mydb = mysql.connector.connect(
-    host="localhost",
-    user="admin",
-    password="password",
-    database="olimpiadas_extra",
-    autocommit=True
-)
+
+# FUNCIÓN PARA PARTIR UNA LISTA (NO SE USA)
+def chunks(lst):
+    for i in range(0, len(lst), 100000):
+        yield lst[i:i + 100000]
+
+
+# FUNCIÓN PARA BORRAR LAS TABLAS
+def borrarTablas():
+    mycursor.execute("DELETE FROM Participacion")
+    mycursor.execute("DELETE FROM Evento")
+    mycursor.execute("DELETE FROM Olimpiada")
+    mycursor.execute("DELETE FROM Equipo")
+    mycursor.execute("DELETE FROM Deportista")
+    mycursor.execute("DELETE FROM Deporte")
+
+
+def crearTablas():
+    mycursor.execute("CREATE TABLE Deporte (id_deporte, nombre)")
+    mycursor.execute("CREATE TABLE Deportista (id_deportista, nombre, sexo, peso, altura)")
+    mycursor.execute("CREATE TABLE Equipo (id_equipo, nombre, iniciales)")
+    mycursor.execute("CREATE TABLE Evento (id_evento, nombre)")
+    mycursor.execute("CREATE TABLE Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad)")
+    mycursor.execute("CREATE TABLE Participacion (id_deportista, id_evento, id_equipo, edad, medalla)")
+
+
+opc = input(
+    """¿Que desea hacer?
+    1. Insertar los datos en mysql
+    2. Insertar los datos en sqlite
+    """)
+
+# CREAMOS LA CONEXIÓN A LA BASE DE DATOS
+if opc == "1":
+    mydb = mysql.connector.connect(
+        host="localhost",
+        user="admin",
+        password="password",
+        database="olimpiadas_extra",
+        autocommit=True  # autocommit, para que se inserten los datos directamente
+    )
+
+    s = "%s"
+elif opc == "2":
+    mydb = sqlite3.connect("sqlite.db")
+    mydb.isolation_level = "IMMEDIATE"
+    s = "?"
+else:
+    exit()
+
 mycursor = mydb.cursor()
 
 # BORRAMOS LAS TABLAS PARA UNA CORRECTA INSERCIÓN DE LOS DATOS
-mycursor.execute("DELETE FROM Participacion")
-mycursor.execute("DELETE FROM Evento")
-mycursor.execute("DELETE FROM Olimpiada")
-mycursor.execute("DELETE FROM Equipo")
-mycursor.execute("DELETE FROM Deportista")
-mycursor.execute("DELETE FROM Deporte")
+try:
+    borrarTablas()
+except sqlite3.OperationalError as e:
+    crearTablas()
 
 # DECLARAR VARIABLES
 # LINEA: "ID","Name","Sex","Age","Height","Weight","Team","NOC","Games","Year","Season","City","Sport","Event","Medal"
-deportes = {} # {"Sport": [idDeporteAI, row['Sport']}
-deportistas = {} # {idDeportista: ["ID", "Sex", "Height", "Weight"]}
-equipos = {} # {"Team": [idEquipoAI, 'Team', 'NOC']}
-olimpiadas = {} # {"Games": [idOlimpiadaAI, 'Games', 'Year', 'Season', 'City']}
-eventos = {} # {"Event_idOlimpiada": [idEventoAI, row['Event'], idOlimpiada, idDeporte]}
-participaciones = {} # {idParticipacionAI: [idDeportista, idEvento, idEquipo, edad, medalla]}
+deportes = {}  # {"Sport": [idDeporteAI, row['Sport']}
+deportistas = {}  # {idDeportista: ["ID", "Sex", "Height", "Weight"]}
+equipos = {}  # {"Team": [idEquipoAI, 'Team', 'NOC']}
+olimpiadas = {}  # {"Games": [idOlimpiadaAI, 'Games', 'Year', 'Season', 'City']}
+eventos = {}  # {"Event_idOlimpiada": [idEventoAI, row['Event'], idOlimpiada, idDeporte]}
+participaciones = {}  # {idParticipacionAI: [idDeportista, idEvento, idEquipo, edad, medalla]}
 
 # GENERO CLAVES QUE IRÉ INCREMENTANDO PARA LOS VALORES QUE NO TIENEN ID
 idDeporteAI = 1
@@ -92,12 +134,12 @@ with open('data/athlete_events.csv', 'r') as read_obj:
         # EL MISMO NOMBRE (P.E Basketball Men's Basketball) PARA DIFERENTES OLIMPIADAS.
         # SI NO LO TENGO, LO AÑADO, SI LO TENGO, COJO EL ID.
         # PARA LOS EVENTOS SE NECESITAN LOS IDS QUE HEMOS IDO RECOGIENDO
-        if row['Event']+"_"+str(idOlimpiada) not in eventos:
-            eventos[row['Event']+"_"+str(idOlimpiada)] = [idEventoAI, row['Event'], idOlimpiada, idDeporte]
+        if row['Event'] + "_" + str(idOlimpiada) not in eventos:
+            eventos[row['Event'] + "_" + str(idOlimpiada)] = [idEventoAI, row['Event'], idOlimpiada, idDeporte]
             idEvento = idEventoAI
             idEventoAI += 1
         else:
-            idEvento = eventos[row['Event']+"_"+str(idOlimpiada)][0]
+            idEvento = eventos[row['Event'] + "_" + str(idOlimpiada)][0]
 
         # CADA LINEA DEL ARCHIVO ES UNA PARTICIPACIÓN, NO NECESITO COMPROBAR SI LO TENGO O NO. COMPRUEBO LOS CAMPOS 'NA'
         # PARA LAS PARTICIPACIONES TAMBIEN SE NECESITAN LOS IDS QUE HEMOS IDO RECOGIENDO
@@ -114,17 +156,12 @@ with open('data/athlete_events.csv', 'r') as read_obj:
 
         idParticipacionAI += 1  # CLAVE DE PARTICIPACIÓN Y CONTADOR DE LA LINEA
 
-    # FUNCIÓN PARA PARTIR UNA LISTA (NO SE USA)
-    def chunks(lst):
-        for i in range(0, len(lst), 100000):
-            yield lst[i:i + 100000]
+    # PARA LAS INSERCIONES HAY DOS MODOS, CON EL EXECUTEMANY, QUE LE PASAMOS UNA LISTA Y UNA A UNA RECORRIENDO LOS
+    # DICCIONARIOS. PARA OBTENER UNA LISTA DESDE LOS VALORES DE UN DICCIONARIO, USAMOS LA FUNCION VALUES() Y LO
+    # CASTEAMOS A LIST, YA QUE NO ES UNA LISTA COMO TAL.
 
-# PARA LAS INSERCIONES HAY DOS MODOS, CON EL EXECUTEMANY, QUE LE PASAMOS UNA LISTA Y UNA A UNA RECORRIENDO LOS
-# DICCIONARIOS. PARA OBTENER UNA LISTA DESDE LOS VALORES DE UN DICCIONARIO, USAMOS LA FUNCION VALUES() Y LO CASTEAMOS
-# A LIST, YA QUE NO ES UNA LISTA COMO TAL.
-
-# INSERTAMOS LOS DEPORTES
-    sql = "INSERT INTO Deporte (id_deporte, nombre) VALUES (%s, %s);"
+    # INSERTAMOS LOS DEPORTES
+    sql = "INSERT INTO Deporte (id_deporte, nombre) VALUES (" + s + ", " + s + ");"
     listaDeportes = deportes.values()
     mycursor.executemany(sql, listaDeportes)
     # for key in deportes:
@@ -133,8 +170,9 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #     print(val)
     #     mycursor.execute(sql, val)
 
-# INSERTAMOS DEPORTISTAS
-    sql = "insert into Deportista (id_deportista, nombre, sexo, peso, altura) values (%s, %s, %s, %s, %s);"
+    # INSERTAMOS DEPORTISTAS
+    sql = "insert into Deportista (id_deportista, nombre, sexo, peso, altura) " \
+          "values (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ");"
     listaDeportistas = list(deportistas.values())
     mycursor.executemany(sql, listaDeportistas)
     # for key in deportistas:
@@ -144,8 +182,9 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #      print(val)
     #      mycursor.execute(sql, val)
 
-# INSERTAMOS EQUIPOS
-    sql = "insert into Equipo (id_equipo, nombre, iniciales) values (%s, %s, %s);"
+    # INSERTAMOS EQUIPOS
+    sql = "insert into Equipo (id_equipo, nombre, iniciales) " \
+          "values (" + s + ", " + s + ", " + s + ");"
     listaEquipos = list(equipos.values())
     mycursor.executemany(sql, listaEquipos)
     # for key in equipos:
@@ -154,8 +193,10 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #      print(val)
     #      # mycursor.execute(sql, val)
 
-# INSERTAMOS OLIMPIADAS
-    sql = "insert into Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad) values (%s, %s, %s, %s, %s);"
+    # INSERTAMOS OLIMPIADAS
+    sql = "insert into Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad)" \
+          " values (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ");"
+    print(sql)
     listaOlimpiadas = list(olimpiadas.values())
     mycursor.executemany(sql, listaOlimpiadas)
     # for key in olimpiadas:
@@ -164,8 +205,9 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #     print(val)
     #     # mycursor.execute(sql, val)
 
-# INSERTAMOS EVENTOS
-    sql = "insert into Evento (id_evento, nombre, id_olimpiada, id_deporte) values (%s, %s, %s, %s);"
+    # INSERTAMOS EVENTOS
+    sql = "insert into Evento (id_evento, nombre, id_olimpiada, id_deporte) " \
+          "values (" + s + ", " + s + ", " + s + ", " + s + ");"
     listaEventos = list(eventos.values())
     mycursor.executemany(sql, listaEventos)
     # for key in eventos:
@@ -174,24 +216,25 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #     print(val)
     #     mycursor.execute(sql, val)
 
-# INSERTAMOS PARTICIPACIONES
-    sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) values (%s, %s, %s, %s, %s);"
+    # INSERTAMOS PARTICIPACIONES
+    sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) " \
+          "values (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ");"
     listaParticipaciones = list(participaciones.values())
     mycursor.executemany(sql, listaParticipaciones)
-#     # participacionesPartida = chunks(listaParticipaciones)
-#     # for lista in participacionesPartida:
-#     #     mycursor.executemany(sql, lista)
-#     # mycursor.executemany(sql, listaOlimpiadas)
-#     for key in participaciones:
-#         sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla)" \
-#               "values (%s, %s, %s, %s, %s)"
-#         val = participaciones[key]
-#         print(val)
-#         mycursor.execute(sql, val)
+    #     # participacionesPartida = chunks(listaParticipaciones)
+    #     # for lista in participacionesPartida:
+    #     #     mycursor.executemany(sql, lista)
+    #     # mycursor.executemany(sql, listaOlimpiadas)
+    #     for key in participaciones:
+    #         sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla)" \
+    #               "values (%s, %s, %s, %s, %s)"
+    #         val = participaciones[key]
+    #         print(val)
+    #         mycursor.execute(sql, val)
 
     mydb.close()
 
 # MIRO EL MOMENTO EN EL QUE TERMINA LA EJECUCIÓN Y HAGO LA RESTA DE TIEMPOS PARA VER LO QUE HA TARDADO
 timmerEnd = time()
 time = timmerEnd - timmerStart
-print("HA TARDADO "+str(time))
+print("HA TARDADO " + str(time))
