@@ -1,7 +1,7 @@
 from csv import DictReader
 import mysql.connector
 from time import time
-
+# MIRAMOS EL MOMENTO EN EL QUE EMPIEZA LA EJECUCIÓN, PARA LUEGO VER LO QUE TARDA
 timmerStart = time()
 
 # CREAMOS LA CONEXIÓN A LA BASE DE DATOS, con autocommit, para que se inserten los datos directamente
@@ -23,39 +23,44 @@ mycursor.execute("DELETE FROM Deportista")
 mycursor.execute("DELETE FROM Deporte")
 
 # DECLARAR VARIABLES
-# "ID","Name","Sex","Age","Height","Weight","Team","NOC","Games","Year","Season","City","Sport","Event","Medal"
-deportes = {} # {"Sport": ['ID']}
-deportistas = {} # {"Name": ["ID", "Sex", "Height", "Weight"]}
-equipos = {} # {"Team": ["ID", "NOC"]}
-eventos = {} # {"Event": ["ID", "id_olimpiada", "id_deporte"]}
-olimpiadas = {} # {"Games": ["ID", "Year", "City"]}
-participaciones = {} # {"DeportistaEvento": ["id_equipo", "Age", "Medal"]}
+# LINEA: "ID","Name","Sex","Age","Height","Weight","Team","NOC","Games","Year","Season","City","Sport","Event","Medal"
+deportes = {} # {"Sport": [idDeporteAI, row['Sport']}
+deportistas = {} # {idDeportista: ["ID", "Sex", "Height", "Weight"]}
+equipos = {} # {"Team": [idEquipoAI, 'Team', 'NOC']}
+olimpiadas = {} # {"Games": [idOlimpiadaAI, 'Games', 'Year', 'Season', 'City']}
+eventos = {} # {"Event_idOlimpiada": [idEventoAI, row['Event'], idOlimpiada, idDeporte]}
+participaciones = {} # {idParticipacionAI: [idDeportista, idEvento, idEquipo, edad, medalla]}
 
+# GENERO CLAVES QUE IRÉ INCREMENTANDO PARA LOS VALORES QUE NO TIENEN ID
 idDeporteAI = 1
 idEquipoAI = 1
 idEventoAI = 1
 idOlimpiadaAI = 1
+idParticipacionAI = 1
 
+# NECESITO OTRA VARIABLE PARA ALMACENAR EL ID DE LOS CAMPOS CORRESPONDIENTES DE LA LINEA EN LA QUE ESTÉ
 idDeportista = 1
 idDeporte = idDeporteAI
 idEquipo = idEquipoAI
 idEvento = idEventoAI
 idOlimpiada = idOlimpiadaAI
-idParticipacionAI = 1
 
 # LEEMOS EL FICHERO CSV LINEA POR LINEA
 with open('data/athlete_events.csv', 'r') as read_obj:
     csv_dict_reader = DictReader(read_obj)
     for row in csv_dict_reader:
-        idDeportista = row['ID']
-        if not row['Sport'] in deportes:
+        idDeportista = row['ID']  # EL ID DE LA LINEA ES EL DEL DEPORTISTA QUE HACE ESA PARTICIPACIÓN
+
+        # SI NO TENGO EL DEPORTE EN LA LISTA, LO AÑADO, SI LO TENGO, COJO EL ID DE ESE DEPORTE
+        if row['Sport'] not in deportes:
             deportes[row['Sport']] = [idDeporteAI, row['Sport']]
             idDeporte = idDeporteAI
             idDeporteAI += 1
         else:
             idDeporte = deportes[row['Sport']][0]
 
-        if not idDeportista in deportistas:
+        # SI NO TENGO EL DEPORTISTA EN LA LISTA, LO AÑADO. COMPRUEBO LOS VALORES QUE PUEDEN SER 'NA'
+        if idDeportista not in deportistas:
             if row['Height'] == 'NA':
                 height = None
             else:
@@ -67,27 +72,35 @@ with open('data/athlete_events.csv', 'r') as read_obj:
 
             deportistas[idDeportista] = [idDeportista, row['Name'], row['Sex'], height, weight]
 
-        if not row['Team'] in equipos:
+        # SI NO TENGO EL EQUPIO EN LA LISTA, LO AÑADO, SI LO TENGO, COJO EL ID DE ESE EQUIPO
+        if row['Team'] not in equipos:
             equipos[row['Team']] = [idEquipoAI, row['Team'], row['NOC']]
             idEquipo = idEquipoAI
             idEquipoAI += 1
         else:
             idEquipo = equipos[row['Team']][0]
 
-        if not row['Games'] in olimpiadas:
+        # SI NO TENGO LA OLIMPIADA EN LA LISTA, LA AÑADO, SI LA TENGO, COJO EL ID DE ESA OLIMPIADA
+        if row['Games'] not in olimpiadas:
             olimpiadas[row['Games']] = [idOlimpiadaAI, row['Games'], row['Year'], row['Season'], row['City']]
             idOlimpiada = idOlimpiadaAI
             idOlimpiadaAI += 1
         else:
             idOlimpiada = olimpiadas[row['Games']][0]
 
-        if not row['Event'] in eventos:
-            eventos[row['Event']] = [idEventoAI, row['Event'], idOlimpiada, idDeporte]
+        # ENLAZO EL NOMBRE DEL EVENTO CON LA OLIMPIADA PARA GENERAR LA KEY DEL DICCIONARIO, LOS EVENTOS PUEDEN TENER
+        # EL MISMO NOMBRE (P.E Basketball Men's Basketball) PARA DIFERENTES OLIMPIADAS.
+        # SI NO LO TENGO, LO AÑADO, SI LO TENGO, COJO EL ID.
+        # PARA LOS EVENTOS SE NECESITAN LOS IDS QUE HEMOS IDO RECOGIENDO
+        if row['Event']+"_"+str(idOlimpiada) not in eventos:
+            eventos[row['Event']+"_"+str(idOlimpiada)] = [idEventoAI, row['Event'], idOlimpiada, idDeporte]
             idEvento = idEventoAI
             idEventoAI += 1
         else:
-            idEvento = eventos[row['Event']][0]
+            idEvento = eventos[row['Event']+"_"+str(idOlimpiada)][0]
 
+        # CADA LINEA DEL ARCHIVO ES UNA PARTICIPACIÓN, NO NECESITO COMPROBAR SI LO TENGO O NO. COMPRUEBO LOS CAMPOS 'NA'
+        # PARA LAS PARTICIPACIONES TAMBIEN SE NECESITAN LOS IDS QUE HEMOS IDO RECOGIENDO
         if idParticipacionAI not in participaciones:
             if row['Age'] == 'NA':
                 edad = None
@@ -97,13 +110,18 @@ with open('data/athlete_events.csv', 'r') as read_obj:
                 medalla = None
             else:
                 medalla = row['Medal']
-            participaciones[idParticipacionAI] = [str(row['ID']), idEvento, idEquipo, edad, medalla]
-            idParticipacionAI += 1
+            participaciones[idParticipacionAI] = [idDeportista, idEvento, idEquipo, edad, medalla]
 
-    print(len(participaciones))
+        idParticipacionAI += 1  # CLAVE DE PARTICIPACIÓN Y CONTADOR DE LA LINEA
+
+    # FUNCIÓN PARA PARTIR UNA LISTA (NO SE USA)
     def chunks(lst):
         for i in range(0, len(lst), 100000):
             yield lst[i:i + 100000]
+
+# PARA LAS INSERCIONES HAY DOS MODOS, CON EL EXECUTEMANY, QUE LE PASAMOS UNA LISTA Y UNA A UNA RECORRIENDO LOS
+# DICCIONARIOS. PARA OBTENER UNA LISTA DESDE LOS VALORES DE UN DICCIONARIO, USAMOS LA FUNCION VALUES() Y LO CASTEAMOS
+# A LIST, YA QUE NO ES UNA LISTA COMO TAL.
 
 # INSERTAMOS LOS DEPORTES
     sql = "INSERT INTO Deporte (id_deporte, nombre) VALUES (%s, %s)"
@@ -157,21 +175,23 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #     mycursor.execute(sql, val)
 
 # INSERTAMOS PARTICIPACIONES
-#     sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) values (%s, %s, %s, %s, %s)"
-#     listaParticipaciones = list(participaciones.values())
-#     mycursor.executemany(sql, listaParticipaciones)
+    sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) values (%s, %s, %s, %s, %s)"
+    listaParticipaciones = list(participaciones.values())
+    mycursor.executemany(sql, listaParticipaciones)
 #     # participacionesPartida = chunks(listaParticipaciones)
 #     # for lista in participacionesPartida:
 #     #     mycursor.executemany(sql, lista)
 #     # mycursor.executemany(sql, listaOlimpiadas)
-    for key in participaciones:
-        sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) values (%s, %s, %s, %s, %s)"
-        val = participaciones[key]
-        print(val)
-        mycursor.execute(sql, val)
+#     for key in participaciones:
+#         sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla)" \
+#               "values (%s, %s, %s, %s, %s)"
+#         val = participaciones[key]
+#         print(val)
+#         mycursor.execute(sql, val)
 
     mydb.close()
 
+# MIRO EL MOMENTO EN EL QUE TERMINA LA EJECUCIÓN Y HAGO LA RESTA DE TIEMPOS PARA VER LO QUE HA TARDADO
 timmerEnd = time()
 time = timmerEnd - timmerStart
-print(" HA TARDADO "+str(time))
+print("HA TARDADO "+str(time))
