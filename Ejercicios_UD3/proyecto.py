@@ -124,7 +124,7 @@ with open('data/athlete_events.csv', 'r') as read_obj:
 # A LIST, YA QUE NO ES UNA LISTA COMO TAL.
 
 # INSERTAMOS LOS DEPORTES
-    sql = "INSERT INTO Deporte (id_deporte, nombre) VALUES (%s, %s)"
+    sql = "INSERT INTO Deporte (id_deporte, nombre) VALUES (%s, %s);"
     listaDeportes = deportes.values()
     mycursor.executemany(sql, listaDeportes)
     # for key in deportes:
@@ -134,7 +134,7 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #     mycursor.execute(sql, val)
 
 # INSERTAMOS DEPORTISTAS
-    sql = "insert into Deportista (id_deportista, nombre, sexo, peso, altura) values (%s, %s, %s, %s, %s)"
+    sql = "insert into Deportista (id_deportista, nombre, sexo, peso, altura) values (%s, %s, %s, %s, %s);"
     listaDeportistas = list(deportistas.values())
     mycursor.executemany(sql, listaDeportistas)
     # for key in deportistas:
@@ -145,7 +145,7 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #      mycursor.execute(sql, val)
 
 # INSERTAMOS EQUIPOS
-    sql = "insert into Equipo (id_equipo, nombre, iniciales) values (%s, %s, %s)"
+    sql = "insert into Equipo (id_equipo, nombre, iniciales) values (%s, %s, %s);"
     listaEquipos = list(equipos.values())
     mycursor.executemany(sql, listaEquipos)
     # for key in equipos:
@@ -155,7 +155,7 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #      # mycursor.execute(sql, val)
 
 # INSERTAMOS OLIMPIADAS
-    sql = "insert into Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad) values (%s, %s, %s, %s, %s)"
+    sql = "insert into Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad) values (%s, %s, %s, %s, %s);"
     listaOlimpiadas = list(olimpiadas.values())
     mycursor.executemany(sql, listaOlimpiadas)
     # for key in olimpiadas:
@@ -165,7 +165,7 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #     # mycursor.execute(sql, val)
 
 # INSERTAMOS EVENTOS
-    sql = "insert into Evento (id_evento, nombre, id_olimpiada, id_deporte) values (%s, %s, %s, %s)"
+    sql = "insert into Evento (id_evento, nombre, id_olimpiada, id_deporte) values (%s, %s, %s, %s);"
     listaEventos = list(eventos.values())
     mycursor.executemany(sql, listaEventos)
     # for key in eventos:
@@ -175,7 +175,7 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     #     mycursor.execute(sql, val)
 
 # INSERTAMOS PARTICIPACIONES
-    sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) values (%s, %s, %s, %s, %s)"
+    sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) values (%s, %s, %s, %s, %s);"
     listaParticipaciones = list(participaciones.values())
     mycursor.executemany(sql, listaParticipaciones)
 #     # participacionesPartida = chunks(listaParticipaciones)
