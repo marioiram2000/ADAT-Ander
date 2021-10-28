@@ -15,21 +15,21 @@ def chunks(lst):
 
 # FUNCIÓN PARA BORRAR LAS TABLAS
 def borrarTablas():
-    mycursor.execute("DELETE FROM Participacion")
-    mycursor.execute("DELETE FROM Evento")
-    mycursor.execute("DELETE FROM Olimpiada")
-    mycursor.execute("DELETE FROM Equipo")
-    mycursor.execute("DELETE FROM Deportista")
-    mycursor.execute("DELETE FROM Deporte")
+    mycursor.execute("DELETE FROM Participacion;")
+    mycursor.execute("DELETE FROM Evento;")
+    mycursor.execute("DELETE FROM Olimpiada;")
+    mycursor.execute("DELETE FROM Equipo;")
+    mycursor.execute("DELETE FROM Deportista;")
+    mycursor.execute("DELETE FROM Deporte;")
 
 
 def crearTablas():
-    mycursor.execute("CREATE TABLE Deporte (id_deporte, nombre)")
-    mycursor.execute("CREATE TABLE Deportista (id_deportista, nombre, sexo, peso, altura)")
-    mycursor.execute("CREATE TABLE Equipo (id_equipo, nombre, iniciales)")
-    mycursor.execute("CREATE TABLE Evento (id_evento, nombre)")
-    mycursor.execute("CREATE TABLE Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad)")
-    mycursor.execute("CREATE TABLE Participacion (id_deportista, id_evento, id_equipo, edad, medalla)")
+    mycursor.execute("CREATE TABLE Deporte (id_deporte, nombre);")
+    mycursor.execute("CREATE TABLE Deportista (id_deportista, nombre, sexo, peso, altura);")
+    mycursor.execute("CREATE TABLE Equipo (id_equipo, nombre, iniciales);")
+    mycursor.execute("CREATE TABLE Evento (id_evento, nombre, id_olimpiada, id_deporte);")
+    mycursor.execute("CREATE TABLE Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad);")
+    mycursor.execute("CREATE TABLE Participacion (id_deportista, id_evento, id_equipo, edad, medalla);")
 
 
 opc = input(
@@ -196,7 +196,6 @@ with open('data/athlete_events.csv', 'r') as read_obj:
     # INSERTAMOS OLIMPIADAS
     sql = "insert into Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad)" \
           " values (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ");"
-    print(sql)
     listaOlimpiadas = list(olimpiadas.values())
     mycursor.executemany(sql, listaOlimpiadas)
     # for key in olimpiadas:
