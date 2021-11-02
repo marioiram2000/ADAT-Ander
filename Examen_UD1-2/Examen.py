@@ -104,13 +104,16 @@ def buscarBatallasRegion():
         for linea in reader:
             if linea[23] == region:
                 isRegion = True
+                resultado = "Gana atacante"
+                if linea[13] == "loss":
+                    resultado = "Gana defensor"
                 print("\n" + linea[23] +
                       "\n\tLocalización: " + linea[22] +
                       "\n\tNombre de la batalla: " + linea[0] +
                       "\n\tAño: " + linea[1] +
                       "\n\tRey atacante: " + linea[3] +
                       "\n\tRey defensor:" + linea[4] +
-                      "\n\tResultado para los atacantes: " + linea[13])
+                      "\n\tResultado: " + resultado)
 
         if not isRegion:
             print("Lo lamento, no hay batallas en esa región")
@@ -126,7 +129,10 @@ def crearXML():
             ET.SubElement(batalla, "nombre").text = linea[0]
             ET.SubElement(batalla, "anio").text = linea[1]
             ET.SubElement(batalla, "region").text = linea[23]
-            ET.SubElement(batalla, "localizacion").text = linea[22]
+            localizacion = linea[22]
+            if localizacion == "":
+                localizacion = "No place"
+            ET.SubElement(batalla, "localizacion").text = localizacion
 
             ganaAtacante = "Si"
             if linea[13] == "loss":
@@ -184,18 +190,29 @@ def crearBinario():
 def eliminarBatalla():
     id_batalla = input("Introduce el identificador de la batalla: ")
     batallas = []
+    batallaEncontrada = False
+
     with open('battles.pickle', 'rb') as openHandler:
         while True:
             try:
                 batalla = pickle.load(openHandler)
                 if batalla.id_batalla != id_batalla:
                     batallas.append(batalla)
+                else:
+                    batallaEncontrada = True
+                    conf = input("¿DESEA ELIMINAR LA BARALLA? S/N \n")
+                    if conf.upper() == "N":
+                        batallas.append(batalla)
+                    else:
+                        print("\nBatalla eliminada\n")
             except EOFError:
                 break
     with open('battles.pickle', 'wb+') as writeHandler:
         for batalla in batallas:
             pickle.dump(batalla, writeHandler)
-    print("\nBatalla eliminada\n")
+    if not batallaEncontrada:
+        print("\nNo se ha encontrado una batalla con ese id\n")
+
 
 opc = "-1"
 while opc != "0":

@@ -360,7 +360,7 @@
       <nombre>Battle of the Burning Septry</nombre>
       <anio>299</anio>
       <region>The Riverlands</region>
-      <localizacion/>
+      <localizacion>No place</localizacion>
       <ataque tamanio="" gana="Si">
          <rey>No King</rey>
          <comandante/>
