@@ -11,13 +11,13 @@ def getMySQLConnection():
         database="olimpiadas_extra",
         autocommit=True  # autocommit, para que se inserten los datos directamente
     )
-    return mydb.cursor()
+    return mydb
 
 
 def getSQLiteConnection():
     mydb = sqlite3.connect("sqlite.db")
     mydb.isolation_level = "IMMEDIATE"
-    return mydb.cursor()
+    return mydb
 
 
 # FUNCIÓN PARA PARTIR UNA LISTA (NO SE USA)
@@ -47,11 +47,10 @@ def crearTablas(mycursor):
 
 def insertarDatos(s, mycursor):
     # BORRAMOS LAS TABLAS PARA UNA CORRECTA INSERCIÓN DE LOS DATOS
-    if s == "?":
-        try:
-            borrarTablas(mycursor)
-        except sqlite3.OperationalError:
-            crearTablas(mycursor)
+    try:
+        borrarTablas(mycursor)
+    except sqlite3.OperationalError:
+        crearTablas(mycursor)
 
     # DECLARAR VARIABLES
     # LINEA: "ID","Name","Sex","Age","Height","Weight","Team","NOC","Games","Year",
@@ -224,51 +223,132 @@ def insertarDatos(s, mycursor):
 
 
 def listarDeportistaDiferenteDeporte(mycursor):
-    sql = "SELECT Deportista.nombre, Deportista.sexo, Deportista.peso, Deportista.altura, Deporte.nombre as deporte, " \
-          "             Participacion.edad, Equipo.nombre, Olimpiada.nombre, Participacion.medalla, Evento.nombre " \
-          "FROM Deportista, Participacion, Evento, Deporte, Equipo, Olimpiada" \
-          "WHERE Deportista.id_deportista = Participacion.id_deportista" \
-          "AND Equipo.id_equipo = Participacion.id_equipo" \
-          "AND Deporte.id_deporte = Evento.id_deporte" \
-          "AND Participacion.id_evento = Evento.id_evento" \
-          "AND Evento.id_olimpiada = Olimpiada.id_olimpiada" \
+    sql = "SELECT deportista.nombre, deportista.sexo, deportista.peso, deportista.altura, Deporte.nombre as deporte, " \
+          "Participacion.edad, Equipo.nombre as equipo, Olimpiada.nombre as olimpiada, " \
+          "Participacion.medalla, Evento.nombre as evento " \
+          "FROM Deportista deportista, Participacion, Evento, Deporte, Equipo, Olimpiada " \
+          "WHERE deportista.id_deportista = Participacion.id_deportista " \
+          "AND Equipo.id_equipo = Participacion.id_equipo " \
+          "AND Deporte.id_deporte = Evento.id_deporte " \
+          "AND Participacion.id_evento = Evento.id_evento " \
+          "AND Evento.id_olimpiada = Olimpiada.id_olimpiada " \
           "AND 1 < (" \
-          "     SELECT count(distinct Evento.id_deporte)" \
-          "     FROM Evento, Participacion" \
-          "     WHERE Evento.id_evento =  Participacion.id_evento" \
-          "     AND Participacion.id_deportista = Deportista.id_deportista" \
-          ")" \
-          "order by Deportista.nombre"
+          "     SELECT count(distinct Evento.id_deporte) " \
+          "     FROM Evento, Participacion " \
+          "     WHERE Evento.id_evento =  Participacion.id_evento " \
+          "     AND Participacion.id_deportista = deportista.id_deportista" \
+          ") " \
+          "order by deportista.nombre"
+    print(sql)
     mycursor.execute(sql)
     myresult = mycursor.fetchall()
     for x in myresult:
         print(x)
 
 
+def listarDeportistasParticipantes(mycursor, s,  temporada):
+    sql = "SELECT id_olimpiada, nombre, anio, ciudad FROM Olimpiada where temporada = " + s + ";"
+    mycursor.execute(sql, (temporada,))
+    myresult = mycursor.fetchall()
+    for x in myresult:
+        print(x)
+
+
+def listarEdiciones(mycursor, s, temp):
+    print("Olimpiadas de la temporada "+temp+":")
+    sql = "SELECT id_olimpiada, nombre, anio, ciudad FROM Olimpiada where temporada = "+s+""
+    mycursor.execute(sql, (temp,))
+    myresult = mycursor.fetchall()
+    ids = []
+    for x in myresult:
+        print("\tid: "+str(x[0])+" año: "+str(x[2])+" ciudad: "+x[3])
+        ids.append(str(x[0]))
+    return ids
+
+
+def listarDeportesOlimpada(mycursor, s, olimp):
+    print("Deportes de la olimpiada " + olimp + ":")
+    sql = "SELECT Deporte.id_deporte, Deporte.nombre " \
+          "FROM Deporte, Evento " \
+          "WHERE Deporte.id_deporte = Evento.id_deporte " \
+          "AND Evento.id_olimpiada = "+s+" " \
+          "group by Deporte.id_deporte " \
+          "order by Deporte.id_deporte;"
+    mycursor.execute(sql, (olimp,))
+    myresult = mycursor.fetchall()
+    ids = []
+    for x in myresult:
+        print("\tid: " + str(x[0]) + " deporte: " + str(x[1]) )
+        ids.append(str(x[0]))
+    return ids
+
+
+def listarEventosDeporteOlimpiada(mycursor, s, olimp, dep):
+    print("Eventos del deporte"+dep+" en la olimpiada "+olimp+":")
+    sql = "SELECT id_evento, nombre FROM Evento WHERE id_olimpiada = "+s+" AND id_deporte = "+s+";"
+    mycursor.execute(sql, (olimp, dep))
+    myresult = mycursor.fetchall()
+    ids = []
+    for x in myresult:
+        print("\tid: "+str(x[0])+" nombre: "+str(x[1]))
+        ids.append(str(x[0]))
+    return ids
+
 opc = "-1"
 while opc != "0":
     if opc == "1":
-        cursor = getMySQLConnection()
-        insertarDatos("%s", cursor)
-        cursor.close()
+        db = getMySQLConnection()
+        insertarDatos("%s", db.cursor())
+        db.close()
     elif opc == "2":
-        cursor = getSQLiteConnection()
-        insertarDatos("?", cursor)
-        cursor.close()
+        db = getSQLiteConnection()
+        insertarDatos("?", db.cursor())
+        db.commit()
+        db.close()
     elif opc == "3":
         bbdd = input("¿Que base de datos desea usar? (MySQL/SQLite)")
-        while bbdd.lower() != "mysql" or bbdd.lower() != "sqlite":
-            bbdd = input("¿Introduzca una base de datos? (MySQL/SQLite)")
+        while (bbdd.lower() != "mysql") and (bbdd.lower() != "sqlite"):
+            bbdd = input("Introduzca una base de datos correcta (MySQL/SQLite)")
 
         if bbdd.lower() == "mysql":
-            cursor = getMySQLConnection()
+            db = getMySQLConnection()
         else:
-            cursor = getSQLiteConnection()
+            db = getSQLiteConnection()
+        print("Deportistas que han participado en diferentes deportes:")
+        listarDeportistaDiferenteDeporte(db.cursor())
 
-        listarDeportistaDiferenteDeporte(cursor)
     elif opc == "4":
         bbdd = input("¿Que base de datos desea usar? (MySQL/SQLite)")
+        while (bbdd.lower() != "mysql") and (bbdd.lower() != "sqlite"):
+            bbdd = input("Introduzca una base de datos correcta (MySQL/SQLite)")
+        if bbdd.lower() == "mysql":
+            db = getMySQLConnection()
+            s = "%s"
+        else:
+            db = getSQLiteConnection()
+            s = "?"
+
         temporada = input("En que temporada buscamos? (W/S)")
+        while (temporada.lower() != "w") and (temporada.lower() != "s"):
+            bbdd = input("Introduzca una temporada correcta (W/S)")
+
+        temp = 'Summer' if temporada.lower() == 's' else 'Winter'
+        olimpiadas = listarEdiciones(db.cursor(), s, temp)
+        olimpiada = input("Introduce el id de una olimpiada: ")
+        while olimpiada not in olimpiadas:
+            olimpiada = input("Introduce un id válido: ")
+
+        deportes = listarDeportesOlimpada(db.cursor(), s, olimpiada)
+        deporte = input("Introduce el id de un deporte: ")
+        while deporte not in deportes:
+            deporte = input("Introduce un id válido: ")
+
+        eventos = listarEventosDeporteOlimpiada(db.cursor(), s, olimpiada, deporte)
+        evento = input("Introduce el id de un evento: ")
+        while evento not in eventos:
+            evento = input("Introduce un id válido: ")
+
+        
 
     opc = input(
         """¿Que desea hacer?
