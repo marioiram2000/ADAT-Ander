@@ -45,6 +45,19 @@ def crearTablas(mycursor):
     mycursor.execute("CREATE TABLE Participacion (id_deportista, id_evento, id_equipo, edad, medalla);")
 
 
+def seleccionarBD():
+    bbdd = input("¿Que base de datos desea usar? (MySQL/SQLite)")
+    while (bbdd.lower() != "mysql") and (bbdd.lower() != "sqlite"):
+        bbdd = input("Introduzca una base de datos correcta (MySQL/SQLite)")
+    if bbdd.lower() == "mysql":
+        db = getMySQLConnection()
+        s = "%s"
+    else:
+        db = getSQLiteConnection()
+        s = "?"
+    return db, s
+
+
 def insertarDatos(s, mycursor):
     # BORRAMOS LAS TABLAS PARA UNA CORRECTA INSERCIÓN DE LOS DATOS
     try:
@@ -222,9 +235,6 @@ def insertarDatos(s, mycursor):
         #         mycursor.execute(sql, val)
 
 
-def seleccionarBD():
-
-
 def listarDeportistaDiferenteDeporte(mycursor):
     sql = "SELECT deportista.nombre, deportista.sexo, deportista.peso, deportista.altura, Deporte.nombre as deporte, " \
           "Participacion.edad, Equipo.nombre as equipo, Olimpiada.nombre as olimpiada, " \
@@ -242,7 +252,6 @@ def listarDeportistaDiferenteDeporte(mycursor):
           "     AND Participacion.id_deportista = deportista.id_deportista" \
           ") " \
           "order by deportista.nombre"
-    print(sql)
     mycursor.execute(sql)
     myresult = mycursor.fetchall()
     for x in myresult:
@@ -250,37 +259,17 @@ def listarDeportistaDiferenteDeporte(mycursor):
 
 
 def listarDeportistasParticipantes():
-    bbdd = input("¿Que base de datos desea usar? (MySQL/SQLite)")
-    while (bbdd.lower() != "mysql") and (bbdd.lower() != "sqlite"):
-        bbdd = input("Introduzca una base de datos correcta (MySQL/SQLite)")
-    if bbdd.lower() == "mysql":
-        db = getMySQLConnection()
-        s = "%s"
-    else:
-        db = getSQLiteConnection()
-        s = "?"
+    db, s = seleccionarBD()
 
     cursor = db.cursor()
 
-    temporada = input("En que temporada buscamos? (W/S)")
-    while (temporada.lower() != "w") and (temporada.lower() != "s"):
-        bbdd = input("Introduzca una temporada correcta (W/S)")
+    temporada = introducirTemporada()
 
-    temp = 'Summer' if temporada.lower() == 's' else 'Winter'
-    olimpiadas = listarEdiciones(cursor, s, temp)
-    olimpiada = input("Introduce el id de una olimpiada: ")
-    while olimpiada not in olimpiadas:
-        olimpiada = input("Introduce un id válido: ")
+    olimpiada = introducirOlimpiada(cursor, s, temporada)
 
-    deportes = listarDeportesOlimpada(cursor, s, olimpiada)
-    deporte = input("Introduce el id de un deporte: ")
-    while deporte not in deportes:
-        deporte = input("Introduce un id válido: ")
+    deporte = introducirDeporteOlimpiada(cursor, olimpiada, s)
 
-    eventos = listarEventosDeporteOlimpiada(cursor, s, olimpiada, deporte)
-    evento = input("Introduce el id de un evento: ")
-    while evento not in eventos:
-        evento = input("Introduce un id válido: ")
+    evento = introducirEvento(cursor, deporte, olimpiada, s)
 
     print("Deportistas participantes: \n")
     query = "select Deportista.nombre, altura, peso, edad, Equipo.nombre, medalla " \
@@ -302,6 +291,23 @@ def listarDeportistasParticipantes():
               "\n\t-Medalla:" + str(row[5]) +
               "\n")
         contResultDep += 1
+
+
+def introducirDeporteOlimpiada(cursor, olimpiada, s):
+    deportes = listarDeportesOlimpada(cursor, s, olimpiada)
+    deporte = input("Introduce el id de un deporte: ")
+    while deporte not in deportes:
+        deporte = input("Introduce un id válido: ")
+    return deporte
+
+
+def introducirTemporada():
+    temporada = input("En que temporada buscamos? (W/S)")
+    while (temporada.lower() != "w") and (temporada.lower() != "s"):
+        temporada = input("Introduzca una temporada correcta (W/S)")
+
+    temporada = 'Summer' if temporada.lower() == 's' else 'Winter'
+    return temporada
 
 
 def listarEdiciones(mycursor, s, temp):
@@ -333,7 +339,6 @@ def listarDeportesOlimpada(mycursor, s, olimp):
     return ids
 
 
-
 def listarEventosDeporteOlimpiada(mycursor, s, olimp, dep):
     print("Eventos del deporte" + dep + " en la olimpiada " + olimp + ":")
     sql = "SELECT id_evento, nombre FROM Evento WHERE id_olimpiada = " + s + " AND id_deporte = " + s + ";"
@@ -345,29 +350,32 @@ def listarEventosDeporteOlimpiada(mycursor, s, olimp, dep):
         ids.append(str(x[0]))
     return ids
 
+
 def listarDeportistaPorNombre(mycursor, s, nombre):
     print("Deportistas: ")
     sql = "select id_deportista, nombre, altura, peso, sexo from Deportista where nombre like " + s
-    mycursor.execute(sql, (nombre,))
+    mycursor.execute(sql, ("%" + nombre + "%",))
+    print(mycursor.statement)
     myresult = mycursor.fetchall()
     ids = []
     for x in myresult:
         print("\tid_deportista: " + str(x[0])
               + " nombre: " + str(x[1])
               + " altura: " + str(x[2])
-              + " peso: " + x[3]
-              + " sexo: " + x[3])
+              + " peso: " + str(x[3])
+              + " sexo: " + x[4])
         ids.append(str(x[0]))
     return ids
 
+
 def listarParticipacionesDeportista(mycursor, s, id_deportista):
-    print("Participaciones")
+    print("Participaciones: ")
     sql = "SELECT Participacion.id_deportista, Participacion.id_evento, Evento.nombre as evento, " \
           "Equipo.nombre as equipo, Participacion.edad, Participacion.medalla " \
           "FROM Participacion, Evento, Equipo " \
-          "where id_deportista = 5 " \
-          "AND Evento.id_evento = Participacion.id_evento " \
-          "AND Equipo.id_equipo = Participacion.id_equipo"
+          "where id_deportista = " + s + "" \
+                                         "AND Evento.id_evento = Participacion.id_evento " \
+                                         "AND Equipo.id_equipo = Participacion.id_equipo"
 
     mycursor.execute(sql, (id_deportista,))
     myresult = mycursor.fetchall()
@@ -375,14 +383,127 @@ def listarParticipacionesDeportista(mycursor, s, id_deportista):
     cont = 0
     for x in myresult:
         print("\t"
-              + "id: "+str(cont)
-              + "Evento: " + str(x[2])
+              + "id: " + str(cont)
+              + " Evento: " + str(x[2])
               + " Equipo: " + str(x[3])
               + " Edad: " + str(x[4])
-              + " Medalla: " + x[5])
+              + " Medalla: " + str(x[5]))
         ids.append([str(x[0]), str(x[1])])
+        cont += 1
     return ids
+
+
+def cambiarMedalla(mycursor, s, deportista, evento, medalla):
+    sql = "UPDATE Participacion SET medalla = " + s + " WHERE id_deportista = " + s + " AND id_evento = " + s
+    mycursor.execute(sql, (medalla, deportista, evento))
+
+
+def insertDeportista(cursor, s, nombre):
+    print("Vamos a introducir un nuevo deportista")
+    sql = "INSERT INTO Deportista (nombre, sexo, peso, altura) VALUES (" + s + ", " + s + ", " + s + ", " + s + ")"
+    sexo = input("Introduce el sexo (M/F) ")
+    while sexo not in ('M', 'F'):
+        sexo = input("Introduce un sexo válido (M/F) ")
+
+    peso = int(input("Introduce el peso (Kg) "))
+    while peso < 20 or peso > 500:
+        peso = int(input("Introduce un peso válido (Kg) "))
+
+    altura = int(input("Introduce la altura (cm) "))
+    while altura < 20 or altura > 350:
+        altura = int(input("Introduce una altura válida (cm) "))
+
+    cursor.execute(sql, (nombre, sexo, peso, altura))
+    print("Deportista introducido.")
+    return cursor.lastrowid
+
+
+def listarEquipos(cursor):
+    print("Equipos: ")
+    sql = "SELECT id_equipo, nombre, iniciales FROM Equipo"
+    cursor.execute(sql)
+    myresult = cursor.fetchall()
+    ids = []
+    for x in myresult:
+        print("\tid_equipo: " + str(x[0])
+              + " nombre: " + str(x[1])
+              + " iniciales: " + str(x[2]))
+        ids.append(str(x[0]))
+    return ids
+
+
+def insertParticipacion(cursor, s, id_deportista):
+    print("Vamos a introducir una participacion")
+    temporada = introducirTemporada()
+
+    olimpiada = introducirOlimpiada(cursor, s, temporada)
+
+    deporte = introducirDeporteOlimpiada(cursor, olimpiada, s)
+
+    evento = introducirEvento(cursor, deporte, olimpiada, s)
+
+    equipos = listarEquipos(cursor)
+    equipo = input("Introduce el id del equipo: ")
+    while equipo not in equipos:
+        equipo = input("Introduce un id válido: ")
+
+    sql = "INSERT INTO Participacion (id_deportista, id_evento, id_equipo, edad, medalla) " \
+          "VALUES (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ")"
+
+    edad = int(input("Introduce la edad: "))
+    while edad < 13 or edad > 120:
+        edad = int(input("Introduce una edad válida: "))
+
+    medalla = introducirMedalla()
+
+    cursor.execute(sql, (deportista, evento, equipo, edad, medalla))
+    print("Participación introducida.")
+
+
+def introducirEvento(cursor, deporte, olimpiada, s):
+    eventos = listarEventosDeporteOlimpiada(cursor, s, olimpiada, deporte)
+    evento = input("Introduce el id de un evento: ")
+    while evento not in eventos:
+        evento = input("Introduce un id válido: ")
+    return evento
+
+
+def introducirOlimpiada(cursor, s, temporada):
+    olimpiadas = listarEdiciones(cursor, s, temporada)
+    olimpiada = input("Introduce el id de una olimpiada: ")
+    while olimpiada not in olimpiadas:
+        olimpiada = input("Introduce un id válido: ")
+    return olimpiada
+
+
+def borrarParticipacion(cursor, s, deportista, evento):
+    sql = "DELETE FROM Participacion WHERE id_deportista = "+s+" AND id_evento = "+s
+    cursor.execute(sql, (deportista, evento))
+    print("Participación eliminada")
+
 opc = "-1"
+
+
+def buscarDeportistaPorNombre():
+    nombre = input("Introduce el nombre de un deportista: ")
+    deportistas = listarDeportistaPorNombre(cursor, s, nombre)
+    deportista = input("Introduce el id del deportista: ")
+    while deportista not in deportistas:
+        deportista = input("Introduce un id válido: ")
+    return deportista
+
+
+def introducirMedalla():
+    medalla = input("Que medalla le quieres introducir?(Gold/Silver/Bronze/None) ")
+    medallas = ['Gold', 'Silver', 'Bronze', 'None']
+    while medalla not in medallas:
+        medalla = input("Introduce una medalla válida. (Gold/Silver/Bronze/None) ")
+    if medalla == 'None':
+        medalla = None
+
+    return medalla
+
+
 while opc != "0":
     if opc == "1":
         db = getMySQLConnection()
@@ -394,14 +515,7 @@ while opc != "0":
         db.commit()
         db.close()
     elif opc == "3":
-        bbdd = input("¿Que base de datos desea usar? (MySQL/SQLite)")
-        while (bbdd.lower() != "mysql") and (bbdd.lower() != "sqlite"):
-            bbdd = input("Introduzca una base de datos correcta (MySQL/SQLite)")
-
-        if bbdd.lower() == "mysql":
-            db = getMySQLConnection()
-        else:
-            db = getSQLiteConnection()
+        db, s = seleccionarBD()
         print("Deportistas que han participado en diferentes deportes:")
         listarDeportistaDiferenteDeporte(db.cursor())
 
@@ -409,28 +523,54 @@ while opc != "0":
         listarDeportistasParticipantes()
 
     elif opc == "5":
-        bbdd = input("¿Que base de datos desea usar? (MySQL/SQLite)")
-        while (bbdd.lower() != "mysql") and (bbdd.lower() != "sqlite"):
-            bbdd = input("Introduzca una base de datos correcta (MySQL/SQLite)")
-        if bbdd.lower() == "mysql":
-            db = getMySQLConnection()
-            s = "%s"
-        else:
-            db = getSQLiteConnection()
-            s = "?"
+        db, s = seleccionarBD()
 
         cursor = db.cursor()
-        nombre = input("Introduce el nombre de un deportista")
-        deportistas = listarDeportistaPorNombre(cursor, s, nombre)
-        deportista = input("Introduce el id del deportista")
-        while deportista not in deportistas:
-            deporte = input("Introduce un id válido: ")
 
-        participacion = input("Introduce el id de la participacion")
+        deportista = buscarDeportistaPorNombre()
+
         participaciones = listarParticipacionesDeportista(cursor, s, deportista)
-        while participacion < len(participaciones) or participacion > len(participaciones):
+        participacion = input("Introduce el id de la participacion: ")
+        while int(participacion) >= len(participaciones) or int(participacion) < 0:
             participacion = input("Introduce un id válido: ")
 
+        deportista = participaciones[int(participacion)][0]
+        evento = participaciones[int(participacion)][1]
+
+        medalla = introducirMedalla()
+
+        cambiarMedalla(cursor, s, deportista, evento, medalla)
+
+    elif opc == "6":
+        db, s = seleccionarBD()
+
+        cursor = db.cursor()
+        nombre = input("Introduce el nombre de un deportista, si no encontramos uno, se añadirá: ")
+        deportistas = listarDeportistaPorNombre(cursor, s, nombre)
+        if len(deportistas) == 0:
+            deportista = insertDeportista(cursor, s, nombre)
+        else:
+            deportista = input("Introduce el id del deportista: ")
+            while deportista not in deportistas:
+                deportista = input("Introduce un id válido: ")
+
+        insertParticipacion(cursor, s, deportista)
+
+    elif opc == "7":
+        db, s = seleccionarBD()
+        cursor = db.cursor()
+
+        deportista = buscarDeportistaPorNombre()
+
+        participaciones = listarParticipacionesDeportista(cursor, s, deportista)
+        participacion = input("Introduce el id de la participacion: ")
+        while int(participacion) >= len(participaciones) or int(participacion) < 0:
+            participacion = input("Introduce un id válido: ")
+
+        deportista = participaciones[int(participacion)][0]
+        evento = participaciones[int(participacion)][1]
+
+        borrarParticipacion(cursor, s, deportista, evento)
 
     opc = input(
         """¿Que desea hacer?
@@ -438,4 +578,7 @@ while opc != "0":
         2. Insertar los datos en sqlite
         3. Listado de deportistas en diferentes deportes
         4. Listado de deportistas participantes
+        5. Modificar medalla deportista
+        6. Añadir deportista/participacion
+        7. Eliminar participación
         """)
