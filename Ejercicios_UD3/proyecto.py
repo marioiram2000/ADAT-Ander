@@ -263,8 +263,8 @@ def listarDeportistaDiferenteDeporte(mycursor):
 
 
 # FUNCIÓN PARA LISTAR LOS DEPORTISTAS QUE PARTICIPAN EN UN DEPORTE INTRODUCIDO DE UNA OLIMPIADA INTRODUCIDA DE UNA TEMPORADA INTRODUCIDA
-def listarDeportistasParticipantes():
-    db, s = seleccionarBD()
+def listarDeportistasParticipantes(db, s):
+
 
     cursor = db.cursor()
 
@@ -545,9 +545,12 @@ while opc != "0":
         db, s = seleccionarBD()
         print("Deportistas que han participado en diferentes deportes:")
         listarDeportistaDiferenteDeporte(db.cursor())
+        db.close()
 
     elif opc == "4":
-        listarDeportistasParticipantes()
+        db, s = seleccionarBD()
+        listarDeportistasParticipantes(db, s)
+        db.close()
 
     elif opc == "5":
         db, s = seleccionarBD()
@@ -567,6 +570,7 @@ while opc != "0":
         medalla = introducirMedalla()
 
         cambiarMedalla(cursor, s, deportista, evento, medalla)
+        db.close()
 
     elif opc == "6":
         db, s = seleccionarBD()
@@ -582,6 +586,7 @@ while opc != "0":
                 deportista = input("Introduce un id válido: ")
 
         insertParticipacion(cursor, s, deportista)
+        db.close()
 
     elif opc == "7":
         db, s = seleccionarBD()
@@ -598,6 +603,7 @@ while opc != "0":
         evento = participaciones[int(participacion)][1]
 
         borrarParticipacion(cursor, s, deportista, evento)
+        db.close()
 
     opc = input(
         """¿Que desea hacer?
