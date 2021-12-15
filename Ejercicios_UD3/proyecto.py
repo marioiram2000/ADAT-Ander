@@ -2,62 +2,6 @@ from csv import DictReader
 import mysql.connector
 import sqlite3
 
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-
-Base = declarative_base()
-
-
-class Deporte(Base):
-    __tablename__ = 'Deporte'
-    id_deporte = Column(Integer, primary_ky=True)
-    nombre = Column(String)
-
-
-class Deportista(Base):
-    __tablename__ = 'Deportista'
-    id_deportista = Column(Integer, primary_ky=True)
-    nombre = Column(String)
-    sexo = Column(String)
-    peso = Column(Integer)
-    altura = Column(Integer)
-
-
-class Equipo(Base):
-    __tablename__ = 'Equipo'
-    id_evento = Column(Integer, primary_ky=True)
-    nombre = Column(String)
-
-
-class Olimpiada(Base):
-    __tablename__ = 'Olimpiada'
-    id_olimpiada = Column(Integer, primary_ky=True)
-    nombre = Column(String)
-    anio = Column(Integer)
-    temporada = Column(String)
-    ciudad = Column(String)
-
-
-class Evento(Base):
-    __tablename__ = 'Evento'
-    id_evento = Column(Integer, primary_ky=True)
-    nombre = Column(String)
-    olimpiada = relationship("Olimpiada", back_populates="Evento")
-
-
-Olimpiada.evento = relationship("Evento", order_by=Evento.id_evento, back_populates="Olimpiada")
-#NO ENTIENDO BIEN COMO SE RELACIONAN ENTRE ELLOS
-
-
-class Participacion(Base):
-    id_deportista = relationship("Deportista", back_populates="Participacion")
-    id_evento = relationship("Evento", back_populates="Participacion")
-    id_equipo = relationship("Equipo", back_populates="Participacion")
-    edad = Column(Integer)
-    medalla = Column(String)
-
-
 
 def getMySQLConnection():
     mydb = mysql.connector.connect(
@@ -149,7 +93,7 @@ def insertarDatos(s, mycursor):
     idOlimpiada = idOlimpiadaAI
 
     # LEEMOS EL FICHERO CSV LINEA POR LINEA
-    with open('data/athlete_events.csv', 'r') as read_obj:
+    with open('../Ejercicios_UD4/data/athlete_events.csv', 'r') as read_obj:
         csv_dict_reader = DictReader(read_obj)
         for row in csv_dict_reader:
             idDeportista = row['ID']  # EL ID DE LA LINEA ES EL DEL DEPORTISTA QUE HACE ESA PARTICIPACIÓN
@@ -270,6 +214,7 @@ def insertarDatos(s, mycursor):
         sql = "insert into Evento (id_evento, nombre, id_olimpiada, id_deporte) " \
               "values (" + s + ", " + s + ", " + s + ", " + s + ");"
         listaEventos = list(eventos.values())
+        print(listaEventos)
         mycursor.executemany(sql, listaEventos)
         # for key in eventos:
         #     sql = "insert into Evento (nombre, id_olimpiada, id_deporte) values (%s, %s, %S)"
@@ -320,6 +265,8 @@ def listarDeportistaDiferenteDeporte(mycursor):
 
 # FUNCIÓN PARA LISTAR LOS DEPORTISTAS QUE PARTICIPAN EN UN DEPORTE INTRODUCIDO DE UNA OLIMPIADA INTRODUCIDA DE UNA TEMPORADA INTRODUCIDA
 def listarDeportistasParticipantes(db, s):
+
+
     cursor = db.cursor()
 
     temporada = introducirTemporada()

@@ -2,22 +2,85 @@ from csv import DictReader
 import mysql.connector
 import sqlite3
 
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, PrimaryKeyConstraint
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, Query, Session, sessionmaker
+
+Base = declarative_base()
+
 
 def getMySQLConnection():
-    mydb = mysql.connector.connect(
-        host="localhost",
-        user="admin",
-        password="password",
-        database="olimpiadas_extra",
-        autocommit=True  # autocommit, para que se inserten los datos directamente
-    )
-    return mydb
+    return create_engine("mysql+pymysql://admin:password@localhost/olimpiadas_extra", echo=False)
 
 
 def getSQLiteConnection():
-    mydb = sqlite3.connect("sqlite.db")
-    mydb.isolation_level = "IMMEDIATE"
-    return mydb
+    return create_engine('sqlite:///sqlite.db', echo=False)
+
+
+class Deporte(Base):
+    __tablename__ = 'Deporte'
+    id_deporte = Column(Integer, primary_key=True)
+    nombre = Column(String)
+
+
+class Deportista(Base):
+    __tablename__ = 'Deportista'
+    id_deportista = Column(Integer, primary_key=True)
+    nombre = Column(String)
+    sexo = Column(String)
+    peso = Column(Integer)
+    altura = Column(Integer)
+
+
+class Equipo(Base):
+    __tablename__ = 'Equipo'
+    id_equipo = Column(Integer, primary_key=True)
+    nombre = Column(String)
+    iniciales = Column(String)
+
+
+class Olimpiada(Base):
+    __tablename__ = 'Olimpiada'
+    id_olimpiada = Column(Integer, primary_key=True)
+    nombre = Column(String)
+    anio = Column(Integer)
+    temporada = Column(String)
+    ciudad = Column(String)
+
+
+class Evento(Base):
+    __tablename__ = 'Evento'
+    id_evento = Column(Integer, primary_key=True)
+    nombre = Column(String)
+    id_olimpiada = Column(Integer, ForeignKey('Olimpiada.id_olimpiada'))
+    id_deporte = Column(Integer, ForeignKey('Deporte.id_deporte'))
+    olimpiada = relationship("Olimpiada", back_populates="eventos")
+
+
+Olimpiada.eventos = relationship("Evento", back_populates="olimpiada")
+
+
+class Participacion(Base):
+    __tablename__ = 'Participacion'
+    id_deportista = Column(Integer, ForeignKey('Deportista.id_deportista'), primary_key=True)
+    id_evento = Column(Integer, ForeignKey('Evento.id_evento'), primary_key=True)
+    id_equipo = Column(Integer, ForeignKey('Equipo.id_equipo'))
+    edad = Column(Integer)
+    medalla = Column(String)
+
+    deportista = relationship("Deportista", back_populates="participaciones")
+    evento = relationship("Evento", back_populates="participaciones")
+    equipo = relationship("Equipo", back_populates="participaciones")
+
+    __table_args__ = (
+        PrimaryKeyConstraint(id_deportista, id_evento),
+        {},
+    )
+
+
+Deportista.participaciones = relationship("Participacion", back_populates="deportista")
+Evento.participaciones = relationship("Participacion", back_populates="evento")
+Equipo.participaciones = relationship("Participacion", back_populates="equipo")
 
 
 # FUNCIÓN PARA PARTIR UNA LISTA (NO SE USA)
@@ -27,23 +90,23 @@ def chunks(lst):
 
 
 # FUNCIÓN PARA BORRAR LAS TABLAS
-def borrarTablas(mycursor):
-    mycursor.execute("DELETE FROM Participacion;")
-    mycursor.execute("DELETE FROM Evento;")
-    mycursor.execute("DELETE FROM Olimpiada;")
-    mycursor.execute("DELETE FROM Equipo;")
-    mycursor.execute("DELETE FROM Deportista;")
-    mycursor.execute("DELETE FROM Deporte;")
+def borrarTablas(session):
+    session.execute("DELETE FROM Participacion;")
+    session.execute("DELETE FROM Evento;")
+    session.execute("DELETE FROM Olimpiada;")
+    session.execute("DELETE FROM Equipo;")
+    session.execute("DELETE FROM Deportista;")
+    session.execute("DELETE FROM Deporte;")
 
 
 # FUNCIÓN PARA CREAR LAS TABLAS
-def crearTablas(mycursor):
-    mycursor.execute("CREATE TABLE Deporte (id_deporte, nombre);")
-    mycursor.execute("CREATE TABLE Deportista (id_deportista, nombre, sexo, peso, altura);")
-    mycursor.execute("CREATE TABLE Equipo (id_equipo, nombre, iniciales);")
-    mycursor.execute("CREATE TABLE Evento (id_evento, nombre, id_olimpiada, id_deporte);")
-    mycursor.execute("CREATE TABLE Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad);")
-    mycursor.execute("CREATE TABLE Participacion (id_deportista, id_evento, id_equipo, edad, medalla);")
+def crearTablas(session):
+    session.execute("CREATE TABLE Deporte (id_deporte, nombre);")
+    session.execute("CREATE TABLE Deportista (id_deportista, nombre, sexo, peso, altura);")
+    session.execute("CREATE TABLE Equipo (id_equipo, nombre, iniciales);")
+    session.execute("CREATE TABLE Evento (id_evento, nombre, id_olimpiada, id_deporte);")
+    session.execute("CREATE TABLE Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad);")
+    session.execute("CREATE TABLE Participacion (id_deportista, id_evento, id_equipo, edad, medalla);")
 
 
 # FUNCIÓN PARA SELECCIONAR LA BD
@@ -53,20 +116,18 @@ def seleccionarBD():
         bbdd = input("Introduzca una base de datos correcta (MySQL/SQLite)")
     if bbdd.lower() == "mysql":
         db = getMySQLConnection()
-        s = "%s"
     else:
         db = getSQLiteConnection()
-        s = "?"
-    return db, s
+    return db
 
 
 # FUNCIÓN DE INSERCIÓN DE DATOS
-def insertarDatos(s, mycursor):
+def insertarDatos(session):
     # BORRAMOS LAS TABLAS PARA UNA CORRECTA INSERCIÓN DE LOS DATOS
     try:
-        borrarTablas(mycursor)
+        borrarTablas(session)
     except sqlite3.OperationalError:
-        crearTablas(mycursor)
+        crearTablas(session)
 
     # DECLARAR VARIABLES
     # LINEA: "ID","Name","Sex","Age","Height","Weight","Team","NOC","Games","Year",
@@ -93,7 +154,7 @@ def insertarDatos(s, mycursor):
     idOlimpiada = idOlimpiadaAI
 
     # LEEMOS EL FICHERO CSV LINEA POR LINEA
-    with open('data/athlete_events.csv', 'r') as read_obj:
+    with open('../Ejercicios_UD3/data/athlete_events.csv', 'r') as read_obj:
         csv_dict_reader = DictReader(read_obj)
         for row in csv_dict_reader:
             idDeportista = row['ID']  # EL ID DE LA LINEA ES EL DEL DEPORTISTA QUE HACE ESA PARTICIPACIÓN
@@ -162,80 +223,44 @@ def insertarDatos(s, mycursor):
 
             idParticipacionAI += 1  # CLAVE DE PARTICIPACIÓN Y CONTADOR DE LA LINEA
 
-        # PARA LAS INSERCIONES HAY DOS MODOS, CON EL EXECUTEMANY, QUE LE PASAMOS UNA LISTA Y UNA A UNA RECORRIENDO LOS
-        # DICCIONARIOS. PARA OBTENER UNA LISTA DESDE LOS VALORES DE UN DICCIONARIO, USAMOS LA FUNCION VALUES() Y LO
-        # CASTEAMOS A LIST, YA QUE NO ES UNA LISTA COMO TAL.
-
         # INSERTAMOS LOS DEPORTES
-        sql = "INSERT INTO Deporte (id_deporte, nombre) VALUES (" + s + ", " + s + ");"
-        listaDeportes = deportes.values()
-        mycursor.executemany(sql, listaDeportes)
-        # for key in deportes:
-        #     sql = "INSERT INTO Deporte (id_deporte, nombre) VALUES (%s, %s)"
-        #     val = deportes[key]
-        #     print(val)
-        #     mycursor.execute(sql, val)
+        for key in deportes:
+            row = deportes[key]
+            d = Deporte(id_deporte=row[0], nombre=row[1])
+            session.add(d)
 
         # INSERTAMOS DEPORTISTAS
-        sql = "insert into Deportista (id_deportista, nombre, sexo, peso, altura) " \
-              "values (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ");"
-        listaDeportistas = list(deportistas.values())
-        mycursor.executemany(sql, listaDeportistas)
-        # for key in deportistas:
-        #      sql = "insert into Deportista (id_deportista, nombre, sexo, peso, altura) values (%s, %s, %s, %s, %s)"
-        #      val = deportistas[key]
-        #
-        #      print(val)
-        #      mycursor.execute(sql, val)
+        for key in deportistas:
+            row = deportistas[key]
+            d = Deportista(id_deportista=row[0], nombre=row[1], sexo=row[2], peso=row[3], altura=row[4])
+            session.add(d)
 
         # INSERTAMOS EQUIPOS
-        sql = "insert into Equipo (id_equipo, nombre, iniciales) " \
-              "values (" + s + ", " + s + ", " + s + ");"
-        listaEquipos = list(equipos.values())
-        mycursor.executemany(sql, listaEquipos)
-        # for key in equipos:
-        #      sql = "insert into Equipo (id_equipo, nombre, iniciales) values (%s, %s, %s)"
-        #      val = equipos[key]
-        #      print(val)
-        #      # mycursor.execute(sql, val)
+        for key in equipos:
+            row = equipos[key]
+            e = Equipo(id_equipo=row[0], nombre=row[1], iniciales=row[2])
+            session.add(e)
 
         # INSERTAMOS OLIMPIADAS
-        sql = "insert into Olimpiada (id_olimpiada, nombre, anio, temporada, ciudad)" \
-              " values (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ");"
-        listaOlimpiadas = list(olimpiadas.values())
-        mycursor.executemany(sql, listaOlimpiadas)
-        # for key in olimpiadas:
-        #     sql = "insert into Olimpiada (nombre, anio, temporada, ciudad) values (%s, %s, %s, %s)"
-        #     val = olimpiadas[key]
-        #     print(val)
-        #     # mycursor.execute(sql, val)
+        for key in olimpiadas:
+            row = olimpiadas[key]
+            o = Olimpiada(id_olimpiada=int(row[0]), nombre=row[1], anio=row[2], temporada=row[3], ciudad=row[4])
+            session.add(o)
 
         # INSERTAMOS EVENTOS
-        sql = "insert into Evento (id_evento, nombre, id_olimpiada, id_deporte) " \
-              "values (" + s + ", " + s + ", " + s + ", " + s + ");"
-        listaEventos = list(eventos.values())
-        mycursor.executemany(sql, listaEventos)
-        # for key in eventos:
-        #     sql = "insert into Evento (nombre, id_olimpiada, id_deporte) values (%s, %s, %S)"
-        #     val = eventos[key]
-        #     print(val)
-        #     mycursor.execute(sql, val)
+        for key in eventos:
+            row = eventos[key]
+            e = Evento(id_evento=row[0], nombre=row[1], id_olimpiada=row[2], id_deporte=row[3])
+            session.add(e)
 
         # INSERTAMOS PARTICIPACIONES
-        sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla) " \
-              "values (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ");"
-        listaParticipaciones = list(participaciones.values())
-        mycursor.executemany(sql, listaParticipaciones)
-        #     # participacionesPartida = chunks(listaParticipaciones)
-        #     # for lista in participacionesPartida:
-        #     #     mycursor.executemany(sql, lista)
-        #     # mycursor.executemany(sql, listaOlimpiadas)
-        #     for key in participaciones:
-        #         sql = "insert into Participacion (id_deportista, id_evento, id_equipo, edad, medalla)" \
-        #               "values (%s, %s, %s, %s, %s)"
-        #         val = participaciones[key]
-        #         print(val)
-        #         mycursor.execute(sql, val)
+
+        for key in participaciones:
+            row = participaciones[key]
+            p = Participacion(id_deportista=row[0], id_evento=row[1], id_equipo=row[2], edad=row[3], medalla=row[4])
+            session.add(p)
+
+        session.commit()
 
 
 # FUNCIÓN PARA LISTAR LOS DEPORTISTAS QUE PARTICIPAN EN MÁS DE UN DEPORTE
@@ -262,17 +287,16 @@ def listarDeportistaDiferenteDeporte(mycursor):
         print(x)
 
 
-# FUNCIÓN PARA LISTAR LOS DEPORTISTAS QUE PARTICIPAN EN UN DEPORTE INTRODUCIDO DE UNA OLIMPIADA INTRODUCIDA DE UNA TEMPORADA INTRODUCIDA
+# FUNCIÓN PARA LISTAR LOS DEPORTISTAS QUE PARTICIPAN EN UN DEPORTE INTRODUCIDO DE UNA OLIMPIADA INTRODUCIDA DE UNA
+# TEMPORADA INTRODUCIDA
 def listarDeportistasParticipantes(db, s):
-
-
     cursor = db.cursor()
 
     temporada = introducirTemporada()
 
-    olimpiada = introducirOlimpiada(cursor, s, temporada)
+    olimpiada = introducirOlimpiada(cursor, temporada)
 
-    deporte = introducirDeporteOlimpiada(cursor, olimpiada, s)
+    deporte = introducirDeporteOlimpiada(cursor, olimpiada)
 
     evento = introducirEvento(cursor, deporte, olimpiada, s)
 
@@ -318,22 +342,20 @@ def introducirTemporada():
 
 
 # FUNCIÓN PARA LISTAR LAS EDICIONES DE UNA TEMPORADA PASADA POR PARAMETRO
-def listarEdiciones(mycursor, s, temp):
+def listarEdiciones(mycursor, temp):
     print("Olimpiadas de la temporada " + temp + ":")
-    sql = "SELECT id_olimpiada, nombre, anio, ciudad FROM Olimpiada where temporada = " + s + ""
-    mycursor.execute(sql, (temp,))
-    myresult = mycursor.fetchall()
-    ids = []
-    for x in myresult:
-        print("\tid: " + str(x[0]) + " año: " + str(x[2]) + " ciudad: " + x[3])
-        ids.append(str(x[0]))
-    return ids
+    olimpiadas = session.query(Olimpiada).filter(Olimpiada.temporada == temp).all()
+
+    for olimp in olimpiadas:
+        print("\tid: " + olimp.id_olimpiada + " año: " + olimp.anio + " ciudad: " + olimp.ciudad)
+
+    return olimpiadas
 
 
 # FUNCIÓN PARA LISTAR LOS DEPORTES DE UNA OLIMPIADA PASADA POR PARAMETRO
 # EN SQLITE NO FUNCIONA, No sabemos por que
 def listarDeportesOlimpada(mycursor, s, olimp):
-    mydb = sqlite3.connect("sqlite.db")
+    mydb = sqlite3.connect("../Ejercicios_UD3/sqlite.db")
     cursor = mydb.cursor()
     print("Deportes de la olimpiada " + olimp + ":")
     sql = "SELECT distinct Deporte.id_deporte, Deporte.nombre FROM Deporte, Evento WHERE Deporte.id_deporte = Evento.id_deporte AND Evento.id_olimpiada = " + s + " order by Deporte.id_deporte"
@@ -490,12 +512,12 @@ def introducirEvento(cursor, deporte, olimpiada, s):
 
 
 # FUNCIÓN PARA INTRODUCIR UNA OLIMPIADA DE UNA TEMPORADA PASADA POR PARAMETRO
-def introducirOlimpiada(cursor, s, temporada):
-    olimpiadas = listarEdiciones(cursor, s, temporada)
+def introducirOlimpiada(cursor, temporada):
+    olimpiadas = listarEdiciones(cursor, temporada)
     olimpiada = input("Introduce el id de una olimpiada: ")
     while olimpiada not in olimpiadas:
         olimpiada = input("Introduce un id válido: ")
-    return olimpiada
+    return olimpiadas
 
 
 # FUNCIÓN PARA BORRAR UNA PARTICIPACIÓN
@@ -534,13 +556,14 @@ def introducirMedalla():
 while opc != "0":
     if opc == "1":
         db = getMySQLConnection()
-        insertarDatos("%s", db.cursor())
-        db.close()
+        Session = sessionmaker(bind=db)
+        session = Session()
+        insertarDatos(session)
     elif opc == "2":
         db = getSQLiteConnection()
-        insertarDatos("?", db.cursor())
-        db.commit()
-        db.close()
+        Session = sessionmaker(bind=db)
+        session = Session()
+        insertarDatos(session)
     elif opc == "3":
         db, s = seleccionarBD()
         print("Deportistas que han participado en diferentes deportes:")
@@ -548,8 +571,8 @@ while opc != "0":
         db.close()
 
     elif opc == "4":
-        db, s = seleccionarBD()
-        listarDeportistasParticipantes(db, s)
+        db = seleccionarBD()
+        listarDeportistasParticipantes(db)
         db.close()
 
     elif opc == "5":
