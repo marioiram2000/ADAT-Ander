@@ -333,7 +333,7 @@ def listarDeportesOlimpada(session, olimp):
 
 
 # FUNCIÓN PARA LISTAR LOS EVENTOS DE UN DEPORTE PASADO POR PARAMETRO EN UNA OLIMPIDADA PASADA POR PARAMETRO
-def listarEventosDeporteOlimpiada(mycursor, olimp, dep):
+def listarEventosDeporteOlimpiada(session, olimp, dep):
     print("Eventos del deporte " + dep + " en la olimpiada " + olimp + ":")
     ids = []
     for evento in session.query(Evento).filter(Evento.id_olimpiada == olimp, Evento.id_deporte == dep):
@@ -375,12 +375,13 @@ def listarParticipacionesDeportista(session, id_deportista):
 
 # FUNCIÓN PARA CAMBIAR LA MEDALLA DE UNA PARTICIPACION (Parametros: el deportista, el vento, la medalla a introducir)
 def cambiarMedalla(session, deportista, evento, medalla):
-    print(type(deportista),type(evento),medalla)
+    print(type(deportista), type(evento), medalla)
     session.query(Participacion).get((int(deportista), int(evento))).medalla = medalla
     print(participacion)
     # participacion.medalla = medalla
     session.commit()
     # session.refresh()
+
 
 # FUNCIÓN PARA INSERTAR UN DEPORTISTA PASANDOLE EL NOMRBE DE ESTE
 def insertDeportista(session, nombre):
@@ -402,44 +403,37 @@ def insertDeportista(session, nombre):
     session.add(dep)
     session.commit()
 
-
-    print("Deportista introducido."+str(dep.id_deportista))
+    print("Deportista introducido." + str(dep.id_deportista))
     return dep.id_deportista
 
 
 # FUNCIÓN PARA LISTAR TODOS LOS EQUIPOS
-def listarEquipos(cursor):
+def listarEquipos(session):
     print("Equipos: ")
-    sql = "SELECT id_equipo, nombre, iniciales FROM Equipo"
-    cursor.execute(sql)
-    myresult = cursor.fetchall()
     ids = []
-    for x in myresult:
-        print("\tid_equipo: " + str(x[0])
-              + " nombre: " + str(x[1])
-              + " iniciales: " + str(x[2]))
-        ids.append(str(x[0]))
+    for equipo in session.query(Equipo):
+        print("\tid_equipo: " + str(equipo.id_equipo)
+              + " nombre: " + str(equipo.nombre)
+              + " iniciales: " + str(equipo.iniciales))
+        ids.append(str(equipo.id_equipo))
     return ids
 
 
 # FUNCIÓN PARA INSERTAR UNA PARTICIPACIÓN DE UN DEPORTISTA INTRODUCIDO POR PARAMETRO
-def insertParticipacion(cursor, s, id_deportista):
+def insertParticipacion(session, id_deportista):
     print("Vamos a introducir una participacion")
     temporada = introducirTemporada()
 
-    olimpiada = introducirOlimpiada(cursor, s, temporada)
+    olimpiada = introducirOlimpiada(session, temporada)
 
-    deporte = introducirDeporteOlimpiada(cursor, olimpiada, s)
+    deporte = introducirDeporteOlimpiada(session, olimpiada)
 
-    evento = introducirEvento(cursor, deporte, olimpiada, s)
+    evento = introducirEvento(session, deporte, olimpiada)
 
-    equipos = listarEquipos(cursor)
+    equipos = listarEquipos(session)
     equipo = input("Introduce el id del equipo: ")
     while equipo not in equipos:
         equipo = input("Introduce un id válido: ")
-
-    sql = "INSERT INTO Participacion (id_deportista, id_evento, id_equipo, edad, medalla) " \
-          "VALUES (" + s + ", " + s + ", " + s + ", " + s + ", " + s + ")"
 
     edad = int(input("Introduce la edad: "))
     while edad < 13 or edad > 120:
@@ -447,13 +441,17 @@ def insertParticipacion(cursor, s, id_deportista):
 
     medalla = introducirMedalla()
 
-    cursor.execute(sql, (deportista, evento, equipo, edad, medalla))
+    participacion = Participacion(id_deportista=id_deportista, id_evento=evento, id_equipo=equipo, edad=edad,
+                                  medalla=medalla)
+    session.add(participacion)
+    session.commit()
+
     print("Participación introducida.")
 
 
 # FUNCIÓN PARA INTRODUCIR UN EVENTO DE UN DEPORTE Y UNA OLIMPIADA INTRODUCIDAS POR PARAMETROS
-def introducirEvento(cursor, deporte, olimpiada):
-    eventos = listarEventosDeporteOlimpiada(cursor, olimpiada, deporte)
+def introducirEvento(session, deporte, olimpiada):
+    eventos = listarEventosDeporteOlimpiada(session, olimpiada, deporte)
     evento = input("Introduce el id de un evento: ")
     while evento not in eventos:
         evento = input("Introduce un id válido: ")
@@ -470,9 +468,10 @@ def introducirOlimpiada(session, temporada):
 
 
 # FUNCIÓN PARA BORRAR UNA PARTICIPACIÓN
-def borrarParticipacion(cursor, s, deportista, evento):
-    sql = "DELETE FROM Participacion WHERE id_deportista = " + s + " AND id_evento = " + s
-    cursor.execute(sql, (deportista, evento))
+def borrarParticipacion(session, deportista, evento):
+    participacion = session.query(Participacion).get((deportista, evento))
+    session.delete(participacion)
+    session.commit()
     print("Participación eliminada")
 
 
@@ -550,15 +549,16 @@ while opc != "0":
             while deportista not in deportistas:
                 deportista = input("Introduce un id válido: ")
 
-        insertParticipacion(cursor, s, deportista)
+        insertParticipacion(session, deportista)
 
     elif opc == "6":
-        db, s = seleccionarBD()
-        cursor = db.cursor()
+        db = getMySQLConnection()
+        Session = sessionmaker(bind=db)
+        session = Session()
 
-        deportista = buscarDeportistaPorNombre()
+        deportista = buscarDeportistaPorNombre(session)
 
-        participaciones = listarParticipacionesDeportista(cursor, s, deportista)
+        participaciones = listarParticipacionesDeportista(session, deportista)
         participacion = input("Introduce el id de la participacion: ")
         while int(participacion) >= len(participaciones) or int(participacion) < 0:
             participacion = input("Introduce un id válido: ")
@@ -566,7 +566,7 @@ while opc != "0":
         deportista = participaciones[int(participacion)][0]
         evento = participaciones[int(participacion)][1]
 
-        borrarParticipacion(cursor, s, deportista, evento)
+        borrarParticipacion(session, deportista, evento)
 
     opc = input(
         """¿Que desea hacer?
